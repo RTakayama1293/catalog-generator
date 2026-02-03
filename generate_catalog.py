@@ -235,16 +235,15 @@ def generate_catalog(supplier_code, excel_path, template_path, images_dir, outpu
     # テンプレートを直接使用（スライドマスター・ロゴを維持）
     prs = Presentation(template_path)
 
-    # ページごとに処理（最初のページはテンプレートスライドを使用）
-    for page_idx in range(0, len(products), PRODUCTS_PER_PAGE):
-        page_products = products.iloc[page_idx:page_idx + PRODUCTS_PER_PAGE]
+    # 必要なページ数を計算し、先にスライドを複製（置換前にコピーするため）
+    num_pages = (len(products) + PRODUCTS_PER_PAGE - 1) // PRODUCTS_PER_PAGE
+    for _ in range(num_pages - 1):
+        duplicate_slide(prs, 0)
 
-        if page_idx == 0:
-            # 最初のページはテンプレートスライドをそのまま使用
-            slide = prs.slides[0]
-        else:
-            # 2ページ目以降はテンプレートスライドを複製
-            slide = duplicate_slide(prs, 0)
+    # ページごとに処理
+    for page_num, page_idx in enumerate(range(0, len(products), PRODUCTS_PER_PAGE)):
+        page_products = products.iloc[page_idx:page_idx + PRODUCTS_PER_PAGE]
+        slide = prs.slides[page_num]
         
         # 置換辞書を構築
         replacements = {'{{仕入先名}}': supplier_name}
