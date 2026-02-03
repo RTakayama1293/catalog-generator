@@ -147,6 +147,13 @@ def replace_image_placeholder_with_text(slide, placeholder_text, replacement_tex
 
 def build_replacements(product, num, supplier_name):
     """商品データから置換辞書を生成"""
+    # 列名（改行を含む）
+    price_col = '国内定価\n（15％）'
+    msrp_col = '参考上代\n（税込)'
+
+    msrp_val = product[msrp_col]
+    msrp_str = f"{format_price(msrp_val)}（税込）" if pd.notna(msrp_val) else '－'
+
     return {
         '{{仕入先名}}': supplier_name,
         f'{{{{商品名_{num}}}}}': safe_str(product['商品名']),
@@ -155,8 +162,8 @@ def build_replacements(product, num, supplier_name):
         f'{{{{MOQ_{num}}}}}': safe_str(product['発注ロット']),
         f'{{{{温度帯_{num}}}}}': safe_str(product['温度帯']),
         f'{{{{賞味期限_{num}}}}}': safe_str(product['賞味期限']),
-        f'{{{{価格_{num}}}}}': format_price(product['国内定価\n（15％）']),
-        f'{{{{参考上代_{num}}}}}': f"{format_price(product['参考上代\n（税込)'])}（税込）" if pd.notna(product['参考上代\n（税込)']) else '－',
+        f'{{{{価格_{num}}}}}': format_price(product[price_col]),
+        f'{{{{参考上代_{num}}}}}': msrp_str,
         f'{{{{商品説明_{num}}}}}': safe_str(product['商品特徴'], ''),
     }
 
