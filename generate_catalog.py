@@ -102,22 +102,45 @@ def find_and_replace_image(slide, placeholder_text, image_path):
     """画像プレースホルダーを実画像で置換"""
     if not os.path.exists(image_path):
         return False
-    
+
     for shape in slide.shapes:
         if shape.has_text_frame:
             # 全runを結合してチェック
             text = ''.join([
-                ''.join([run.text for run in p.runs]) 
+                ''.join([run.text for run in p.runs])
                 for p in shape.text_frame.paragraphs
             ])
             if placeholder_text in text:
                 left, top = shape.left, shape.top
                 width, height = shape.width, shape.height
-                
+
                 sp = shape._element
                 sp.getparent().remove(sp)
-                
+
                 slide.shapes.add_picture(image_path, left, top, width, height)
+                return True
+    return False
+
+
+def replace_image_placeholder_with_text(slide, placeholder_text, replacement_text):
+    """画像プレースホルダーをテキストで置換（画像がない場合用）"""
+    for shape in slide.shapes:
+        if shape.has_text_frame:
+            # 全runを結合してチェック
+            text = ''.join([
+                ''.join([run.text for run in p.runs])
+                for p in shape.text_frame.paragraphs
+            ])
+            if placeholder_text in text:
+                # プレースホルダーを置換テキストに変更
+                for paragraph in shape.text_frame.paragraphs:
+                    full_text = ''.join([run.text for run in paragraph.runs])
+                    if placeholder_text in full_text:
+                        new_text = full_text.replace(placeholder_text, replacement_text)
+                        if paragraph.runs:
+                            paragraph.runs[0].text = new_text
+                            for run in paragraph.runs[1:]:
+                                run.text = ''
                 return True
     return False
 
@@ -197,12 +220,20 @@ def generate_catalog(supplier_code, excel_path, template_path, images_dir, outpu
         for idx, (_, product) in enumerate(page_products.iterrows()):
             num = idx + 1
             product_id = product['商品連番']
-            image_path = os.path.join(images_dir, supplier_code, f"{product_id}.jpg")
-            
-            if not os.path.exists(image_path):
-                image_path = os.path.join(images_dir, supplier_code, f"{product_id}.png")
-            
-            find_and_replace_image(slide, f'{{{{画像_{num}}}}}', image_path)
+            image_path = None
+
+            # 対応形式: jpg, png, webp
+            for ext in ['jpg', 'png', 'webp']:
+                candidate = os.path.join(images_dir, supplier_code, f"{product_id}.{ext}")
+                if os.path.exists(candidate):
+                    image_path = candidate
+                    break
+
+            if image_path:
+                find_and_replace_image(slide, f'{{{{画像_{num}}}}}', image_path)
+            else:
+                # 画像がない場合は "no image" を表示
+                replace_image_placeholder_with_text(slide, f'{{{{画像_{num}}}}}', 'no image')
     
     # 保存
     os.makedirs(output_dir, exist_ok=True)
