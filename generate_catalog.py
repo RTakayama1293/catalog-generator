@@ -9,11 +9,13 @@
 
 import argparse
 import copy
+import io
 import os
 from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
+from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches
 
@@ -98,10 +100,24 @@ def replace_text_in_table(table, replacements):
                 replace_text_in_paragraph(paragraph, replacements)
 
 
+def convert_image_for_pptx(image_path):
+    """画像をpython-pptx対応形式に変換（WebP→PNG）"""
+    ext = os.path.splitext(image_path)[1].lower()
+    if ext == '.webp':
+        img = Image.open(image_path)
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+        return img_bytes
+    return image_path
+
+
 def find_and_replace_image(slide, placeholder_text, image_path):
     """画像プレースホルダーを実画像で置換"""
     if not os.path.exists(image_path):
         return False
+
+    image_data = convert_image_for_pptx(image_path)
 
     for shape in slide.shapes:
         if shape.has_text_frame:
@@ -117,7 +133,7 @@ def find_and_replace_image(slide, placeholder_text, image_path):
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-                slide.shapes.add_picture(image_path, left, top, width, height)
+                slide.shapes.add_picture(image_data, left, top, width, height)
                 return True
     return False
 
