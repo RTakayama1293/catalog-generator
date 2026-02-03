@@ -231,7 +231,7 @@ def generate_catalog(supplier_code, excel_path, template_path, images_dir, outpu
 
             # 対応形式: jpg, png, webp
             for ext in ['jpg', 'png', 'webp']:
-                candidate = os.path.join(images_dir, supplier_code, f"{product_id}.{ext}")
+                candidate = os.path.join(images_dir, f"{product_id}.{ext}")
                 if os.path.exists(candidate):
                     image_path = candidate
                     break

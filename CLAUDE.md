@@ -17,8 +17,7 @@ catalog-generator/
 ├── data/
 │   └── 受発注管理台帳.xlsx         # 商品マスタ（ここに配置）
 ├── images/
-│   └── {仕入先コード}/             # 商品画像
-│       └── {商品連番}.jpg
+│   └── {商品連番}.jpg              # 商品画像
 └── output/                        # 生成されたカタログ
 ```
 
@@ -73,9 +72,9 @@ libreoffice --headless --convert-to pdf --outdir output output/カタログ_*.pp
 
 ### 画像ファイル
 
-配置: `images/{仕入先コード}/{商品連番}.jpg`
+配置: `images/{商品連番}.jpg`（jpg, png, webp対応）
 
-例: `images/HAK/PRD_SNJ_HAK_0001_01.jpg`
+例: `images/PRD_SNJ_HAK_0001_01.jpg`
 
 ## テンプレート編集
 
