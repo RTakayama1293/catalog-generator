@@ -113,11 +113,16 @@ def convert_image_for_pptx(image_path):
 
 
 def find_and_replace_image(slide, placeholder_text, image_path):
-    """画像プレースホルダーを実画像で置換"""
+    """画像プレースホルダーを実画像で置換（アスペクト比維持）"""
     if not os.path.exists(image_path):
         return False
 
     image_data = convert_image_for_pptx(image_path)
+
+    # 画像のサイズを取得
+    img = Image.open(image_path)
+    img_width, img_height = img.size
+    img_aspect = img_width / img_height
 
     for shape in slide.shapes:
         if shape.has_text_frame:
@@ -127,13 +132,28 @@ def find_and_replace_image(slide, placeholder_text, image_path):
                 for p in shape.text_frame.paragraphs
             ])
             if placeholder_text in text:
-                left, top = shape.left, shape.top
-                width, height = shape.width, shape.height
+                placeholder_left, placeholder_top = shape.left, shape.top
+                placeholder_width, placeholder_height = shape.width, shape.height
+                placeholder_aspect = placeholder_width / placeholder_height
+
+                # アスペクト比を維持してプレースホルダー内に収める
+                if img_aspect > placeholder_aspect:
+                    # 画像が横長 → 幅に合わせる
+                    new_width = placeholder_width
+                    new_height = int(placeholder_width / img_aspect)
+                else:
+                    # 画像が縦長 → 高さに合わせる
+                    new_height = placeholder_height
+                    new_width = int(placeholder_height * img_aspect)
+
+                # 中央揃えのオフセット計算
+                left = placeholder_left + (placeholder_width - new_width) // 2
+                top = placeholder_top + (placeholder_height - new_height) // 2
 
                 sp = shape._element
                 sp.getparent().remove(sp)
 
-                slide.shapes.add_picture(image_data, left, top, width, height)
+                slide.shapes.add_picture(image_data, left, top, new_width, new_height)
                 return True
     return False
 
@@ -184,40 +204,47 @@ def build_replacements(product, num, supplier_name):
     }
 
 
+def duplicate_slide(prs, slide_index):
+    """スライドを複製（スライドマスター・レイアウトを維持）"""
+    source_slide = prs.slides[slide_index]
+    slide_layout = source_slide.slide_layout
+
+    new_slide = prs.slides.add_slide(slide_layout)
+
+    # 元スライドの要素をコピー
+    for shape in source_slide.shapes:
+        el = shape.element
+        new_el = copy.deepcopy(el)
+        new_slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
+
+    return new_slide
+
+
 def generate_catalog(supplier_code, excel_path, template_path, images_dir, output_dir):
     """カタログ生成メイン処理"""
-    
+
     # データ読み込み
     products, supplier_name = load_data(excel_path, supplier_code)
     print(f"仕入先: {supplier_name}")
     print(f"商品数: {len(products)}件")
-    
+
     if len(products) == 0:
         print("エラー: 対象商品がありません")
         return None
-    
-    # テンプレート読み込み
+
+    # テンプレートを直接使用（スライドマスター・ロゴを維持）
     prs = Presentation(template_path)
-    template_slide = prs.slides[0]
-    
-    # 出力用プレゼンテーション
-    output_prs = Presentation()
-    output_prs.slide_width = prs.slide_width
-    output_prs.slide_height = prs.slide_height
-    
-    # ページごとに処理
+
+    # ページごとに処理（最初のページはテンプレートスライドを使用）
     for page_idx in range(0, len(products), PRODUCTS_PER_PAGE):
         page_products = products.iloc[page_idx:page_idx + PRODUCTS_PER_PAGE]
-        
-        # テンプレートスライドをコピー
-        blank_layout = output_prs.slide_layouts[6]
-        slide = output_prs.slides.add_slide(blank_layout)
-        
-        # テンプレートの要素をコピー
-        for shape in template_slide.shapes:
-            el = shape.element
-            new_el = copy.deepcopy(el)
-            slide.shapes._spTree.insert_element_before(new_el, 'p:extLst')
+
+        if page_idx == 0:
+            # 最初のページはテンプレートスライドをそのまま使用
+            slide = prs.slides[0]
+        else:
+            # 2ページ目以降はテンプレートスライドを複製
+            slide = duplicate_slide(prs, 0)
         
         # 置換辞書を構築
         replacements = {'{{仕入先名}}': supplier_name}
@@ -263,8 +290,8 @@ def generate_catalog(supplier_code, excel_path, template_path, images_dir, outpu
     date_str = datetime.now().strftime('%Y%m%d')
     output_filename = f"カタログ_{supplier_name}_{date_str}.pptx"
     output_path = os.path.join(output_dir, output_filename)
-    
-    output_prs.save(output_path)
+
+    prs.save(output_path)
     print(f"\n生成完了: {output_path}")
     
     return output_path
